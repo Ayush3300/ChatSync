@@ -18,12 +18,15 @@ export const getUsersForSidebar = async (req,res)=>{
                     ],
                 })
                     .sort({ createdAt: -1 })
-                    .select("createdAt")
+                    .select("createdAt text image senderId")
                     .lean()
 
                 return {
                     ...friend.toJSON(),
                     lastMessageAt: lastMessage ? lastMessage.createdAt : null,
+                    lastMessageText: lastMessage?.text || null,
+                    lastMessageIsImage: lastMessage?.image ? true : false,
+                    lastMessageSenderId: lastMessage?.senderId || null,
                 }
             })
         )

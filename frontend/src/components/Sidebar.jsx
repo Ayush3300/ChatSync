@@ -3,7 +3,24 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useFriendStore } from "../store/useFriendStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users, Search, UserPlus, UserCheck, X, Clock, Check, Loader2 } from "lucide-react";
+import { Users, Search, UserPlus, UserCheck, X, Clock, Check, Loader2, ImageIcon } from "lucide-react";
+
+// Returns "2m", "5h", "Mon", etc. like WhatsApp
+function formatLastMsgTime(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return date.toLocaleDateString("en-US", { weekday: "short" });
+  return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+}
 
 const Sidebar = () => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading, unreadCounts } = useChatStore();
@@ -102,46 +119,63 @@ const Sidebar = () => {
         {activeTab === "chats" && (
           <>
             <div className="py-2">
-              {users.map((user) => (
-                <button
-                  key={user._id}
-                  onClick={() => setSelectedUser(user)}
-                  className={`
-                    w-full p-3 flex items-center gap-3
-                    hover:bg-base-300 transition-colors
-                    ${selectedUser?._id === user._id ? "bg-base-300 ring-1 ring-base-300" : ""}
-                  `}
-                >
-                  <div className="relative mx-auto lg:mx-0">
-                    <img
-                      src={user.profilePic || "/avatar.png"}
-                      alt={user.fullName}
-                      className="size-12 object-cover rounded-full"
-                    />
-                    {onlineUsers.includes(user._id) && (
-                      <span
-                        className="absolute bottom-0 right-0 size-3 bg-green-500 
-                        rounded-full ring-2 ring-zinc-900"
+              {users.map((user) => {
+                const { authUser } = useAuthStore.getState();
+                const isMe = user.lastMessageSenderId?.toString() === authUser?._id?.toString();
+                let previewText = "";
+                if (user.lastMessageIsImage && !user.lastMessageText) {
+                  previewText = "📷 Photo";
+                } else if (user.lastMessageText) {
+                  previewText = (isMe ? "You: " : "") + user.lastMessageText;
+                }
+                return (
+                  <button
+                    key={user._id}
+                    onClick={() => setSelectedUser(user)}
+                    className={`
+                      w-full p-3 flex items-center gap-3
+                      hover:bg-base-300 transition-colors
+                      ${selectedUser?._id === user._id ? "bg-base-300 ring-1 ring-base-300" : ""}
+                    `}
+                  >
+                    <div className="relative mx-auto lg:mx-0 flex-shrink-0">
+                      <img
+                        src={user.profilePic || "/avatar.png"}
+                        alt={user.fullName}
+                        className="size-12 object-cover rounded-full"
                       />
-                    )}
-                    {/* Unread message badge */}
-                    {unreadCounts[user._id] > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold
-                        rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                        {unreadCounts[user._id] > 99 ? "99+" : unreadCounts[user._id]}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* User info - only visible on larger screens */}
-                  <div className="hidden lg:block text-left min-w-0">
-                    <div className="font-medium truncate">{user.fullName}</div>
-                    <div className="text-sm text-zinc-400">
-                      {onlineUsers.includes(user._id) ? "Online" : "Offline"}
+                      {onlineUsers.includes(user._id) && (
+                        <span
+                          className="absolute bottom-0 right-0 size-3 bg-green-500 
+                          rounded-full ring-2 ring-zinc-900"
+                        />
+                      )}
+                      {/* Unread message badge */}
+                      {unreadCounts[user._id] > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold
+                          rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                          {unreadCounts[user._id] > 99 ? "99+" : unreadCounts[user._id]}
+                        </span>
+                      )}
                     </div>
-                  </div>
-                </button>
-              ))}
+
+                    {/* User info - only visible on larger screens */}
+                    <div className="hidden lg:flex flex-col text-left min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-medium truncate">{user.fullName}</span>
+                        {user.lastMessageAt && (
+                          <span className="text-xs text-zinc-500 flex-shrink-0">
+                            {formatLastMsgTime(user.lastMessageAt)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-zinc-400 truncate">
+                        {previewText || (onlineUsers.includes(user._id) ? "Online" : "Offline")}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
 
               {users.length === 0 && (
                 <div className="text-center text-zinc-500 py-8 px-4">
