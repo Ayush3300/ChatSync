@@ -40,6 +40,16 @@ export const useChatStore = create ((set,get)=>({
         try {
             const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`,messageData)
             set({messages : [...messages,res.data]})
+
+            // Move selected user to top of sidebar
+            const currentUsers = get().users
+            const idx = currentUsers.findIndex(u => u._id === selectedUser._id)
+            if (idx > 0) {
+                const updated = [...currentUsers]
+                const [user] = updated.splice(idx, 1)
+                updated.unshift(user)
+                set({ users: updated })
+            }
         } catch (error) {
             toast.error(error.response.data.message)
         }
@@ -60,6 +70,17 @@ export const useChatStore = create ((set,get)=>({
                 // message from background contact — increment unread badge
                 const prev = get().unreadCounts
                 set({ unreadCounts: { ...prev, [newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1 } })
+            }
+
+            // Move the message sender to the top of sidebar
+            const currentUsers = get().users
+            const senderId = newMessage.senderId
+            const senderIndex = currentUsers.findIndex(u => u._id === senderId)
+            if (senderIndex > 0) {
+                const updated = [...currentUsers]
+                const [sender] = updated.splice(senderIndex, 1)
+                updated.unshift(sender)
+                set({ users: updated })
             }
         })
     },

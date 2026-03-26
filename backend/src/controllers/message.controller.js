@@ -6,7 +6,37 @@ import { getReceiverSocketId ,io} from "../lib/socket.js"
 export const getUsersForSidebar = async (req,res)=>{
     try {
         const loggedInUser = await User.findById(req.user._id).populate("friends", "-password")
-        res.status(200).json(loggedInUser.friends)
+        const friends = loggedInUser.friends
+
+        // For each friend, find the timestamp of the last message between them and the logged-in user
+        const friendsWithLastMsg = await Promise.all(
+            friends.map(async (friend) => {
+                const lastMessage = await Message.findOne({
+                    $or: [
+                        { senderId: req.user._id, receiverId: friend._id },
+                        { senderId: friend._id, receiverId: req.user._id },
+                    ],
+                })
+                    .sort({ createdAt: -1 })
+                    .select("createdAt")
+                    .lean()
+
+                return {
+                    ...friend.toJSON(),
+                    lastMessageAt: lastMessage ? lastMessage.createdAt : null,
+                }
+            })
+        )
+
+        // Sort: most recent message first, friends with no messages go to the bottom
+        friendsWithLastMsg.sort((a, b) => {
+            if (!a.lastMessageAt && !b.lastMessageAt) return 0
+            if (!a.lastMessageAt) return 1
+            if (!b.lastMessageAt) return -1
+            return new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
+        })
+
+        res.status(200).json(friendsWithLastMsg)
     } catch (error) {
         console.error("Error in getUsersForSidebar: ",error.message)
         res.status(500).json({error : "Internal server error"})
