@@ -42,64 +42,34 @@ export const useChatStore = create ((set,get)=>({
             set({messages : [...messages,res.data]})
 
             // Move selected user to top of sidebar + update preview
-            const currentUsers = get().users
-            const idx = currentUsers.findIndex(u => u._id === selectedUser._id)
-            const updated = [...currentUsers]
-            const targetIdx = idx === -1 ? 0 : idx
-            const [user] = updated.splice(targetIdx, 1)
-            updated.unshift({
-                ...user,
-                lastMessageAt: res.data.createdAt,
-                lastMessageText: res.data.text || null,
-                lastMessageIsImage: !!res.data.image,
-                lastMessageSenderId: res.data.senderId,
-            })
+            const currentUsers = get().users;
+            const updated = currentUsers.map(u => 
+                u._id === selectedUser._id 
+                    ? {
+                        ...u,
+                        lastMessageAt: res.data.createdAt,
+                        lastMessageText: res.data.text || null,
+                        lastMessageIsImage: !!res.data.image,
+                        lastMessageSenderId: res.data.senderId,
+                    }
+                    : u
+            );
+
+            // Sort: most recent message first
+            updated.sort((a, b) => {
+                if (!a.lastMessageAt && !b.lastMessageAt) return 0;
+                if (!a.lastMessageAt) return 1;
+                if (!b.lastMessageAt) return -1;
+                return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+            });
+
             set({ users: updated })
         } catch (error) {
             toast.error(error.response.data.message)
         }
     },
 
-    subscribeToMessages: ()=>{
-        const {selectedUser} = get()
-        if(!selectedUser) return
 
-        const socket = useAuthStore.getState().socket
-
-        socket.on("newMessage",(newMessage)=>{
-            const isFromSelectedUser = newMessage.senderId === selectedUser._id
-            if(isFromSelectedUser){
-                // message is from currently open chat — show it directly
-                set({ messages : [...get().messages, newMessage] })
-            } else {
-                // message from background contact — increment unread badge
-                const prev = get().unreadCounts
-                set({ unreadCounts: { ...prev, [newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1 } })
-            }
-
-            // Move the message sender to the top of sidebar + update preview
-            const currentUsers = get().users
-            const senderId = newMessage.senderId
-            const senderIndex = currentUsers.findIndex(u => u._id === senderId)
-            if (senderIndex !== -1) {
-                const updated = [...currentUsers]
-                const [sender] = updated.splice(senderIndex, 1)
-                updated.unshift({
-                    ...sender,
-                    lastMessageAt: newMessage.createdAt,
-                    lastMessageText: newMessage.text || null,
-                    lastMessageIsImage: !!newMessage.image,
-                    lastMessageSenderId: newMessage.senderId,
-                })
-                set({ users: updated })
-            }
-        })
-    },
-
-    unsubscribeFromMessages : ()=>{
-        const socket = useAuthStore.getState().socket
-        socket.off("newMessage")
-    },
 
     setSelectedUser : (selectedUser)=>{
         // clear unread count for the user being opened
