@@ -40,6 +40,23 @@ function useGlobalMessageListener() {
           }
         })
       }
+
+      // Move sender to top of sidebar + update last message preview
+      const currentUsers = useChatStore.getState().users
+      const senderId = newMessage.senderId
+      const senderIndex = currentUsers.findIndex(u => u._id === senderId)
+      if (senderIndex !== -1) {
+        const updated = [...currentUsers]
+        const [sender] = updated.splice(senderIndex, 1)
+        updated.unshift({
+          ...sender,
+          lastMessageAt: newMessage.createdAt,
+          lastMessageText: newMessage.text || null,
+          lastMessageIsImage: !!newMessage.image,
+          lastMessageSenderId: newMessage.senderId,
+        })
+        useChatStore.setState({ users: updated })
+      }
     }
 
     socket.on("newMessage", handleNewMessage)
